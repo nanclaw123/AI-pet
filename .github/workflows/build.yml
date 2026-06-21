@@ -80,8 +80,10 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ matrix.artifact_pattern }}
-          draft: true
+          draft: false
+          prerelease: false
           name: Release ${{ github.ref_name }}
           generate_release_notes: true
+          fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
