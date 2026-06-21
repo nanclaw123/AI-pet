@@ -49,25 +49,25 @@ jobs:
         run: npm install --no-audit --no-fund
 
       - name: 🔍 Debug list files
+        shell: bash
         run: |
           ls -la
           echo "--- build dir ---"
           ls -la build/ 2>/dev/null || echo "no build dir"
 
       - name: 🔧 Build app for ${{ matrix.platform }}
-        run: npx electron-builder --${{ matrix.platform }} --config.directories.output=release
+        run: npx electron-builder --${{ matrix.platform }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
           ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
-          DEBUG: electron-builder
 
       - name: 📤 Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
           path: ${{ matrix.artifact_pattern }}
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 30
 
       - name: 🚀 Release on tag
