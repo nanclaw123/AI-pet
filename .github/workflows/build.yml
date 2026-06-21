@@ -6,6 +6,10 @@ on:
     tags:
       - 'v*'
 
+# 显式声明权限：需要 contents: write 才能创建 Release
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Build on ${{ matrix.os }}
