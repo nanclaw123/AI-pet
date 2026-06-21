@@ -1,15 +1,10 @@
 name: Build Desktop Apps
 
 on:
-  # 手动触发
   workflow_dispatch:
-  # 打 tag 时自动触发（如 v0.2.0）
   push:
     tags:
       - 'v*'
-  # main 分支推送时也可触发（可选）
-  # push:
-  #   branches: [ main ]
 
 jobs:
   build:
@@ -24,7 +19,6 @@ jobs:
             artifact_name: AI桌面宠物-mac
             artifact_pattern: |
               release/*.dmg
-              release/mac-arm64/*.app
           - os: windows-latest
             platform: win
             artifact_name: AI桌面宠物-win
@@ -46,18 +40,28 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
+      - name: 🐧 Install Linux deps (for AppImage)
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libarchive-tools zsync
+
       - name: 📦 Install dependencies
         run: npm install --no-audit --no-fund
 
+      - name: 🔍 Debug: list files
+        run: |
+          ls -la
+          echo "--- build dir ---"
+          ls -la build/ 2>/dev/null || echo "no build dir"
+
       - name: 🔧 Build app for ${{ matrix.platform }}
-        run: npm run dist:${{ matrix.platform }}
+        run: npx electron-builder --${{ matrix.platform }} --config.directories.output=release
         env:
-          # GitHub Actions 无需代码签名（避免找不到证书报错）
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # 禁用 macOS 代码签名
           CSC_IDENTITY_AUTO_DISCOVERY: false
-          # 加速 Electron 下载（国内镜像）
           ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
+          DEBUG: electron-builder
 
       - name: 📤 Upload artifacts
         uses: actions/upload-artifact@v4

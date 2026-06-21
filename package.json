@@ -33,7 +33,9 @@
       "sfx.js",
       "pet.html",
       "panel.html",
-      "package.json"
+      "package.json",
+      "node_modules/**/*",
+      "!node_modules/**/{CHANGELOG.md,README.md,readme.md,LICENSE,LICENSE.txt,license.txt,*.d.ts,*.md,*.flow,*.coffee,*.ts,*.markdown,*.log,test,tests,__tests__,docs,doc,examples,example,coverage,.github,.vscode,.idea}"
     ],
     "mac": {
       "category": "public.app-category.productivity",
