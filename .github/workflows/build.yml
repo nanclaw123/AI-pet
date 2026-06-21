@@ -49,7 +49,7 @@ jobs:
       - name: 📦 Install dependencies
         run: npm install --no-audit --no-fund
 
-      - name: 🔍 Debug: list files
+      - name: 🔍 Debug list files
         run: |
           ls -la
           echo "--- build dir ---"
