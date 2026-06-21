@@ -1,0 +1,79 @@
+name: Build Desktop Apps
+
+on:
+  # 手动触发
+  workflow_dispatch:
+  # 打 tag 时自动触发（如 v0.2.0）
+  push:
+    tags:
+      - 'v*'
+  # main 分支推送时也可触发（可选）
+  # push:
+  #   branches: [ main ]
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            platform: mac
+            artifact_name: AI桌面宠物-mac
+            artifact_pattern: |
+              release/*.dmg
+              release/mac-arm64/*.app
+          - os: windows-latest
+            platform: win
+            artifact_name: AI桌面宠物-win
+            artifact_pattern: |
+              release/*.exe
+          - os: ubuntu-latest
+            platform: linux
+            artifact_name: AI桌面宠物-linux
+            artifact_pattern: |
+              release/*.AppImage
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🔧 Build app for ${{ matrix.platform }}
+        run: npm run dist:${{ matrix.platform }}
+        env:
+          # GitHub Actions 无需代码签名（避免找不到证书报错）
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # 禁用 macOS 代码签名
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+          # 加速 Electron 下载（国内镜像）
+          ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
+
+      - name: 📤 Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_pattern }}
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: 🚀 Release on tag
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.artifact_pattern }}
+          draft: true
+          name: Release ${{ github.ref_name }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

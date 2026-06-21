@@ -1,0 +1,32 @@
+# macOS
+.DS_Store
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 打包产物
+release/
+dist/
+out/
+
+# 日志
+*.log
+run.log
+build.log
+error.log
+
+# 临时文件
+*.tmp
+*.bak
+*~
+
+# Electron 缓存
+/Library/Caches/electron/
+/Library/Caches/electron-builder/
+
+# VS Code
+.vscode/
+.idea/

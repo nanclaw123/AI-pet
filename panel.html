@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8" />
+<script src="sfx.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: "Microsoft YaHei", sans-serif; }
+  html, body { width: 100%; height: 100%; background: transparent; overflow: hidden; }
+
+  .panel {
+    width: 100%; height: 100%;
+    background: linear-gradient(160deg, #1a2342 0%, #0f1530 100%);
+    border-radius: 16px;
+    border: 1.5px solid rgba(0,212,255,0.4);
+    box-shadow: 0 0 40px rgba(0,150,255,0.35), inset 0 0 30px rgba(0,212,255,0.05);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* 头部 */
+  .header {
+    display: flex; align-items: center; gap: 8px;
+    padding: 13px 16px;
+    background: linear-gradient(135deg, rgba(0,212,255,0.18), rgba(0,100,255,0.08));
+    border-bottom: 1px solid rgba(0,212,255,0.25);
+    color: #00f0ff;
+    -webkit-app-region: drag;
+  }
+  .header .title { font-weight: bold; font-size: 14px; flex: 1; letter-spacing: 0.5px; }
+  .header button {
+    -webkit-app-region: no-drag;
+    border: 1px solid rgba(0,212,255,0.3); background: rgba(0,212,255,0.1);
+    width: 26px; height: 26px; border-radius: 6px;
+    cursor: pointer; font-size: 13px; color: #00f0ff;
+  }
+  .header button:hover { background: rgba(0,212,255,0.3); }
+
+  .content { flex: 1; padding: 16px; overflow-y: auto; }
+  .content::-webkit-scrollbar { width: 6px; }
+  .content::-webkit-scrollbar-thumb { background: rgba(0,212,255,0.3); border-radius: 3px; }
+
+  textarea {
+    width: 100%; height: 80px; padding: 11px;
+    border: 1.5px solid rgba(0,212,255,0.3); border-radius: 10px;
+    font-size: 13px; resize: none; outline: none;
+    background: rgba(0,20,40,0.6); color: #cfe8ff;
+  }
+  textarea::placeholder { color: #5a7a9a; }
+  textarea:focus { border-color: #00d4ff; box-shadow: 0 0 12px rgba(0,212,255,0.3); }
+
+  .styles { display: flex; gap: 8px; margin: 12px 0; }
+  .style-btn {
+    flex: 1; padding: 8px; border: 1.5px solid rgba(0,212,255,0.25);
+    border-radius: 8px; background: rgba(0,20,40,0.5); cursor: pointer;
+    font-size: 12px; color: #8aafd0; transition: all 0.15s;
+  }
+  .style-btn.active {
+    background: linear-gradient(135deg, #00d4ff, #0088ff); color: #001428;
+    border-color: #00d4ff; font-weight: bold;
+    box-shadow: 0 0 12px rgba(0,212,255,0.5);
+  }
+
+  .optimize-btn {
+    width: 100%; padding: 12px; margin-top: 4px;
+    border: none; border-radius: 10px;
+    background: linear-gradient(135deg, #00d4ff, #0066ff);
+    color: #fff; font-size: 14px; font-weight: bold;
+    cursor: pointer; transition: all 0.15s; letter-spacing: 1px;
+    box-shadow: 0 0 16px rgba(0,150,255,0.5);
+  }
+  .optimize-btn:hover { box-shadow: 0 0 24px rgba(0,150,255,0.8); }
+  .optimize-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .result { margin-top: 16px; display: none; }
+  .result.show { display: block; }
+  .result-box {
+    background: rgba(0,30,50,0.6); border: 1.5px solid rgba(0,212,255,0.3);
+    border-radius: 10px; padding: 12px; font-size: 13px;
+    line-height: 1.6; color: #cfe8ff; white-space: pre-wrap;
+    max-height: 150px; overflow-y: auto;
+  }
+  .result-label { font-size: 12px; color: #00f0ff; margin: 14px 0 6px; display:flex; align-items:center; gap:6px;}
+  .copy-btn {
+    margin-left: auto; padding: 4px 12px; font-size: 11px;
+    border: 1px solid rgba(0,212,255,0.4); border-radius: 6px;
+    background: rgba(0,212,255,0.15); color: #00f0ff; cursor: pointer;
+  }
+  .copy-btn:hover { background: rgba(0,212,255,0.35); }
+  .improvements { list-style: none; }
+  .improvements li {
+    background: rgba(0,212,255,0.07); border-left: 3px solid #00d4ff;
+    padding: 7px 11px; margin-bottom: 6px; border-radius: 4px;
+    font-size: 12px; color: #aaccee;
+  }
+
+  .loading { text-align: center; color: #00f0ff; padding: 18px; font-size: 13px; display:none;}
+  .loading.show { display: block; }
+  .loading::after { content:'●●●'; animation: dots 1.2s infinite; letter-spacing:2px; }
+  .error { color: #ff6b8a; font-size: 12px; padding: 11px; background:rgba(255,80,100,0.1);
+    border:1px solid rgba(255,80,100,0.3); border-radius:8px; margin-top:12px; display:none;}
+  .error.show { display: block; }
+
+  /* 示例 chips */
+  .examples { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0; }
+  .example-chip {
+    padding: 5px 10px; font-size: 11px; color: #8aafd0;
+    background: rgba(0,212,255,0.08); border: 1px solid rgba(0,212,255,0.2);
+    border-radius: 12px; cursor: pointer; transition: all 0.15s; white-space: nowrap;
+  }
+  .example-chip:hover { background: rgba(0,212,255,0.2); color: #00f0ff; transform: translateY(-1px); }
+
+  /* 结果操作区 */
+  .result-actions { display: flex; gap: 8px; margin-top: 8px; }
+  .action-btn {
+    flex: 1; padding: 7px; font-size: 12px; border-radius: 7px;
+    border: 1px solid rgba(0,212,255,0.35); background: rgba(0,212,255,0.1);
+    color: #00f0ff; cursor: pointer; transition: all 0.15s;
+  }
+  .action-btn:hover { background: rgba(0,212,255,0.25); }
+  .action-btn.primary { background: linear-gradient(135deg, rgba(0,212,255,0.3), rgba(0,100,255,0.2)); border-color: #00d4ff; }
+
+  /* 历史记录 */
+  .history-section-title { display: flex; align-items: center; justify-content: space-between; margin: 14px 0 8px; }
+  .history-section-title span { font-size: 13px; color: #00f0ff; font-weight: bold; }
+  .clear-hist-btn { font-size: 11px; color: #ff6b8a; background: transparent; border: 1px solid rgba(255,107,138,0.3); padding: 3px 10px; border-radius: 6px; cursor: pointer; }
+  .clear-hist-btn:hover { background: rgba(255,107,138,0.15); }
+  .history-list { display: flex; flex-direction: column; gap: 6px; }
+  .history-item {
+    padding: 9px 11px; background: rgba(0,30,50,0.5); border: 1px solid rgba(0,212,255,0.15);
+    border-radius: 8px; cursor: pointer; transition: all 0.15s;
+  }
+  .history-item:hover { border-color: rgba(0,212,255,0.4); background: rgba(0,30,50,0.8); transform: translateX(2px); }
+  .history-item .h-raw { font-size: 12px; color: #cfe8ff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .history-item .h-meta { font-size: 10px; color: #5a7a9a; margin-top: 3px; display: flex; gap: 8px; }
+  .history-item .h-meta .style-tag { padding: 0 6px; border: 1px solid rgba(0,212,255,0.2); border-radius: 4px; color: #00f0ff; }
+  .history-empty { text-align: center; color: #5a7a9a; font-size: 12px; padding: 20px; }
+
+  /* 视图切换动画 */
+  .view-anim { animation: fadeIn 0.22s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+  /* 模板选择器 */
+  .template-bar { display: flex; gap: 6px; margin: 10px 0 6px; overflow-x: auto; padding-bottom: 2px; }
+  .template-bar::-webkit-scrollbar { height: 0; }
+  .tpl-chip {
+    flex-shrink: 0; padding: 6px 12px; font-size: 12px; color: #8aafd0;
+    background: rgba(0,30,50,0.6); border: 1px solid rgba(0,212,255,0.25);
+    border-radius: 14px; cursor: pointer; transition: all 0.15s; white-space: nowrap;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .tpl-chip:hover { border-color: rgba(0,212,255,0.6); color: #00f0ff; }
+  .tpl-chip.active {
+    background: linear-gradient(135deg, rgba(0,212,255,0.3), rgba(0,100,255,0.15));
+    border-color: #00d4ff; color: #fff; font-weight: bold;
+    box-shadow: 0 0 10px rgba(0,212,255,0.4);
+  }
+  .tpl-chip .ico { font-size: 14px; }
+
+  /* 流式打字机光标 */
+  .typing-cursor::after {
+    content: '▊'; color: #00f0ff; animation: blink 0.8s steps(2) infinite;
+    margin-left: 2px;
+  }
+  @keyframes blink { 0%,50%{opacity:1;} 51%,100%{opacity:0;} }
+
+  /* 对比视图 */
+  .compare-toggle {
+    margin-top: 8px; padding: 5px 10px; font-size: 11px;
+    background: rgba(0,212,255,0.1); border: 1px solid rgba(0,212,255,0.3);
+    color: #00f0ff; border-radius: 6px; cursor: pointer;
+  }
+  .compare-toggle:hover { background: rgba(0,212,255,0.2); }
+  .compare-view { display: none; margin-top: 10px; }
+  .compare-view.show { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .compare-col {
+    background: rgba(0,30,50,0.5); border: 1px solid rgba(0,212,255,0.2);
+    border-radius: 8px; padding: 10px; font-size: 12px;
+  }
+  .compare-col h4 { font-size: 11px; color: #00f0ff; margin-bottom: 6px; font-weight: bold; }
+  .compare-col .body { color: #cfe8ff; white-space: pre-wrap; line-height: 1.5; max-height: 180px; overflow-y: auto; }
+  .compare-col.original { border-color: rgba(255,180,0,0.3); }
+  .compare-col.original h4 { color: #ffd24d; }
+  .compare-col.original .body { color: #aaccee; font-style: italic; }
+
+  .settings { display: none; }
+  .settings.show { display: block; }
+  .settings label { display:block; font-size:12px; color:#8aafd0; margin: 12px 0 5px; }
+  .settings input, .settings select {
+    width: 100%; padding: 9px; border: 1.5px solid rgba(0,212,255,0.3);
+    border-radius: 8px; font-size: 13px; outline: none;
+    background: rgba(0,20,40,0.6); color: #cfe8ff;
+  }
+  .settings input:focus, .settings select:focus { border-color:#00d4ff; }
+  .save-btn { width:100%; padding:11px; margin-top:16px; border:none;
+    border-radius:8px; background:linear-gradient(135deg,#00d4ff,#0066ff);
+    color:#fff; font-weight:bold; cursor:pointer; box-shadow:0 0 16px rgba(0,150,255,0.4);}
+  .hint { font-size: 11px; color: #5a7a9a; margin-top: 8px; line-height:1.6;}
+
+  /* 装扮中心 */
+  .wardrobe-section-title { font-size: 13px; color: #00f0ff; font-weight: bold; margin-bottom: 10px; }
+  .style-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+  .style-chip {
+    flex: 1 1 calc(50% - 4px); padding: 12px 6px; text-align: center;
+    border-radius: 10px; cursor: pointer; font-size: 12px; color: #cfe8ff;
+    background: rgba(0,30,50,0.6); border: 1.5px solid rgba(0,212,255,0.25);
+    transition: all 0.15s;
+  }
+  .style-chip:hover { border-color: rgba(0,212,255,0.6); transform: translateY(-2px); }
+  .style-chip.active { border-color: #00d4ff; background: linear-gradient(135deg, rgba(0,212,255,0.3), rgba(0,100,255,0.15)); box-shadow: 0 0 14px rgba(0,212,255,0.4); color: #fff; font-weight: bold; }
+  .skin-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+  .skin-chip {
+    flex: 1; min-width: 56px; padding: 10px 6px; text-align: center;
+    border-radius: 10px; cursor: pointer; font-size: 11px; color: #fff;
+    background: linear-gradient(135deg, var(--p), var(--q));
+    border: 2px solid transparent; transition: all 0.15s;
+    box-shadow: 0 0 8px var(--p);
+  }
+  .skin-chip:hover { transform: translateY(-2px); }
+  .skin-chip.active { border-color: #fff; box-shadow: 0 0 16px var(--p); transform: scale(1.05); }
+  .acc-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .acc-chip {
+    position: relative; padding: 12px 4px 8px; text-align: center;
+    background: rgba(0,30,50,0.6); border: 1.5px solid rgba(0,212,255,0.25);
+    border-radius: 10px; cursor: pointer; transition: all 0.15s;
+  }
+  .acc-chip:hover { border-color: rgba(0,212,255,0.6); }
+  .acc-chip .emoji { display: block; font-size: 24px; margin-bottom: 4px; }
+  .acc-chip .nm { display: block; font-size: 11px; color: #8aafd0; }
+  .acc-chip .lock {
+    position: absolute; top: 4px; right: 4px; font-size: 9px;
+    background: rgba(255,180,0,0.2); color: #ffd24d; padding: 1px 5px; border-radius: 6px;
+  }
+  .acc-chip.worn { border-color: #4dff88; background: rgba(0,80,40,0.4); box-shadow: 0 0 12px rgba(77,255,136,0.4); }
+  .acc-chip.worn .lock { background: rgba(77,255,136,0.25); color: #4dff88; }
+  .acc-chip.worn .lock::after { content: ' ✓'; }
+  .acc-chip.locked { opacity: 0.4; cursor: not-allowed; filter: grayscale(0.7); }
+
+  /* 装饰分类标签 */
+  .acc-tabs { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+  .acc-tab {
+    padding: 5px 12px; font-size: 12px; color: #8aafd0;
+    background: rgba(0,30,50,0.5); border: 1px solid rgba(0,212,255,0.2);
+    border-radius: 14px; cursor: pointer; transition: all 0.15s;
+  }
+  .acc-tab:hover { color: #00f0ff; border-color: rgba(0,212,255,0.5); }
+  .acc-tab.active {
+    background: linear-gradient(135deg, rgba(0,212,255,0.3), rgba(0,100,255,0.15));
+    border-color: #00d4ff; color: #fff; font-weight: bold;
+  }
+  .acc-chip.hidden { display: none; }
+
+  @keyframes dots { 0%{opacity:0.3;} 50%{opacity:1;} 100%{opacity:0.3;} }
+</style>
+</head>
+<body>
+  <div class="panel">
+    <div class="header">
+      <span>🤖</span>
+      <span class="title">AI-BOT · 提示词优化引擎</span>
+      <span id="levelTag" style="font-size:11px;background:linear-gradient(135deg,#ffd700,#ff9500);color:#4a2800;padding:2px 8px;border-radius:8px;font-weight:bold;-webkit-app-region:no-drag;">Lv.1</span>
+      <button id="wardrobeToggle" title="装扮">🎨</button>
+      <button id="settingsToggle" title="设置">⚙</button>
+      <button id="closeBtn" title="关闭">✕</button>
+    </div>
+
+    <div class="content">
+      <div id="mainView">
+        <textarea id="input" placeholder="输入你想说的话，例如：帮我写个朋友圈文案，关于周末爬山……"></textarea>
+        <!-- 模板选择 -->
+        <div class="template-bar" id="templateBar"></div>
+        <div class="styles">
+          <div class="style-btn active" data-style="rigorous">严谨</div>
+          <div class="style-btn" data-style="creative">创意</div>
+          <div class="style-btn" data-style="concise">简洁</div>
+        </div>
+        <button class="optimize-btn" id="optimizeBtn">✨ 优化一下 <span style="font-size:11px;opacity:0.8;">(Ctrl+Enter)</span></button>
+
+        <!-- 示例 -->
+        <div class="examples" id="examples"></div>
+
+        <div class="loading" id="loading">AI 正在分析 </div>
+        <div class="error" id="error"></div>
+
+        <div class="result" id="result">
+          <div class="result-label">✅ 优化后的提示词
+            <button class="copy-btn" id="copyBtn">复制</button>
+          </div>
+          <div class="result-box" id="optimized"></div>
+          <div class="result-actions">
+            <button class="action-btn primary" id="reOptimizeBtn">🔄 重新优化</button>
+            <button class="action-btn" id="insertOriginalBtn">↩️ 用原文</button>
+            <button class="action-btn" id="insertOptimizedBtn">📋 填回输入</button>
+            <button class="action-btn" id="compareBtn">⚖️ 对比</button>
+          </div>
+          <!-- 对比视图 -->
+          <div class="compare-view" id="compareView">
+            <div class="compare-col original">
+              <h4>📝 原始输入</h4>
+              <div class="body" id="compareOriginal"></div>
+            </div>
+            <div class="compare-col">
+              <h4>✨ 优化结果</h4>
+              <div class="body" id="compareOptimized"></div>
+            </div>
+          </div>
+          <div class="result-label">💡 优化点</div>
+          <ul class="improvements" id="improvements"></ul>
+        </div>
+
+        <!-- 历史记录 -->
+        <div class="history-section-title">
+          <span>📜 历史记录</span>
+          <button class="clear-hist-btn" id="clearHistBtn" style="display:none;">清空</button>
+        </div>
+        <div class="history-list" id="historyList">
+          <div class="history-empty">暂无历史记录，优化一次试试吧~</div>
+        </div>
+
+        <div class="kbd-hint"><span class="kbd">Ctrl</span>+<span class="kbd">Enter</span> 优化 &nbsp; <span class="kbd">Esc</span> 关闭面板</div>
+      </div>
+
+      <div class="settings" id="settingsView">
+        <label>API Key</label>
+        <input type="password" id="apiKey" placeholder="sk-..." />
+        <label>Base URL（OpenAI 兼容接口）</label>
+        <input type="text" id="baseURL" placeholder="https://ezr.sh/v1" />
+        <label>模型名称</label>
+        <input type="text" id="model" placeholder="deepseek-v4-flash" />
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:14px;">
+          <input type="checkbox" id="autoLaunch" style="width:auto;" />
+          <span>💻 开机自启动</span>
+        </label>
+        <button class="save-btn" id="saveBtn">保存设置</button>
+        <p class="hint">🔒 配置仅保存在你本地电脑，不会上传任何服务器。<br>当前已预置 EasyRouter 配置，开箱即用。</p>
+      </div>
+
+      <!-- 装扮中心 -->
+      <div class="settings" id="wardrobeView">
+        <div class="wardrobe-section-title">🖌️ 外观风格</div>
+        <div class="style-grid" id="styleGrid">
+          <div class="style-chip" data-style="tech">🤖 科技风</div>
+          <div class="style-chip" data-style="sketch">✏️ 简笔画</div>
+          <div class="style-chip" data-style="chalk">🖍️ 粉笔白线</div>
+          <div class="style-chip" data-style="cat">🐱 室友猫</div>
+        </div>
+
+        <div class="wardrobe-section-title" style="margin-top:16px;">🎨 皮肤主题</div>
+        <div class="skin-grid" id="skinGrid">
+          <div class="skin-chip" data-skin="aurora" style="--p:#00d4ff;--q:#0088ff;">极光蓝</div>
+          <div class="skin-chip" data-skin="flame"  style="--p:#ff5e3a;--q:#ff2d55;">烈焰红</div>
+          <div class="skin-chip" data-skin="purple" style="--p:#a06bff;--q:#6c2bff;">暗夜紫</div>
+          <div class="skin-chip" data-skin="green"  style="--p:#2bffb4;--q:#00cc88;">极光绿</div>
+          <div class="skin-chip" data-skin="sakura" style="--p:#ff8fc7;--q:#ff5e9c;">樱花粉</div>
+        </div>
+
+        <div class="wardrobe-section-title" style="margin-top:16px;">👕 装饰（点击佩戴/卸下）</div>
+        <div class="acc-tabs" id="accTabs">
+          <div class="acc-tab active" data-cat="all">全部</div>
+          <div class="acc-tab" data-cat="hat">🎩 头部</div>
+          <div class="acc-tab" data-cat="face">🕶️ 面部</div>
+          <div class="acc-tab" data-cat="body">🧣 身体</div>
+          <div class="acc-tab" data-cat="weapon">🗡️ 武器</div>
+          <div class="acc-tab" data-cat="companion">🐤 伙伴</div>
+        </div>
+        <div class="acc-grid" id="accGrid">
+          <div class="acc-chip" data-acc="hat"     data-lv="2" data-cat="hat"><span class="emoji">🎩</span><span class="nm">绅士帽</span><span class="lock">Lv.2</span></div>
+          <div class="acc-chip" data-acc="scarf"   data-lv="2" data-cat="body"><span class="emoji">🧣</span><span class="nm">围巾</span><span class="lock">Lv.2</span></div>
+          <div class="acc-chip" data-acc="flower"  data-lv="2" data-cat="hat"><span class="emoji">🌸</span><span class="nm">小花</span><span class="lock">Lv.2</span></div>
+          <div class="acc-chip" data-acc="phones"  data-lv="3" data-cat="face"><span class="emoji">🎧</span><span class="nm">耳机</span><span class="lock">Lv.3</span></div>
+          <div class="acc-chip" data-acc="glasses" data-lv="3" data-cat="face"><span class="emoji">🕶️</span><span class="nm">墨镜</span><span class="lock">Lv.3</span></div>
+          <div class="acc-chip" data-acc="saber"   data-lv="3" data-cat="weapon"><span class="emoji">🗡️</span><span class="nm">光剑</span><span class="lock">Lv.3</span></div>
+          <div class="acc-chip" data-acc="bow"     data-lv="4" data-cat="hat"><span class="emoji">🎀</span><span class="nm">蝴蝶结</span><span class="lock">Lv.4</span></div>
+          <div class="acc-chip" data-acc="cape"    data-lv="4" data-cat="body"><span class="emoji">🦸</span><span class="nm">披风</span><span class="lock">Lv.4</span></div>
+          <div class="acc-chip" data-acc="wizard"  data-lv="4" data-cat="hat"><span class="emoji">🧙</span><span class="nm">巫师帽</span><span class="lock">Lv.4</span></div>
+          <div class="acc-chip" data-acc="medal"   data-lv="4" data-cat="body"><span class="emoji">🏅</span><span class="nm">勋章</span><span class="lock">Lv.4</span></div>
+          <div class="acc-chip" data-acc="guitar"  data-lv="4" data-cat="weapon"><span class="emoji">🎸</span><span class="nm">吉他</span><span class="lock">Lv.4</span></div>
+          <div class="acc-chip" data-acc="mask"    data-lv="5" data-cat="face"><span class="emoji">🎭</span><span class="nm">面具</span><span class="lock">Lv.5</span></div>
+          <div class="acc-chip" data-acc="wand"    data-lv="5" data-cat="weapon"><span class="emoji">🪄</span><span class="nm">魔法棒</span><span class="lock">Lv.5</span></div>
+          <div class="acc-chip" data-acc="mount"   data-lv="5" data-cat="companion"><span class="emoji">🛹</span><span class="nm">滑板</span><span class="lock">Lv.5</span></div>
+          <div class="acc-chip" data-acc="petbird" data-lv="5" data-cat="companion"><span class="emoji">🐤</span><span class="nm">小鸟伙伴</span><span class="lock">Lv.5</span></div>
+        </div>
+        <p class="hint">💡 升级解锁更多装饰。锁定的装饰需达到对应等级哦~ 可自由组合搭配！</p>
+      </div>
+    </div>
+  </div>
+
+<script>
+  let currentStyle = 'rigorous';
+  let lastOptimized = '';
+  let lastRawInput = '';
+  let currentTemplate = 'general';
+  let isStreaming = false;
+
+  // ===== 模板选择器 =====
+  async function loadTemplates() {
+    const tpls = await window.api.getTemplates();
+    const bar = document.getElementById('templateBar');
+    bar.innerHTML = '';
+    tpls.forEach(t => {
+      const chip = document.createElement('div');
+      chip.className = 'tpl-chip' + (t.id === currentTemplate ? ' active' : '');
+      chip.dataset.tpl = t.id;
+      chip.innerHTML = `<span class="ico">${t.icon}</span><span>${t.name}</span>`;
+      chip.title = t.desc;
+      chip.addEventListener('click', () => {
+        document.querySelectorAll('.tpl-chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        currentTemplate = t.id;
+        SFX.play('click');
+      });
+      bar.appendChild(chip);
+    });
+  }
+  loadTemplates();
+
+  // ===== 流式输出监听 =====
+  const optimizedBox = document.getElementById('optimized');
+  window.api.onOptimizeChunk(({ delta, full }) => {
+    isStreaming = true;
+    // 流式期间，把 JSON 文本原样显示（带光标），最后再由 optimize 的 Promise 结果格式化
+    optimizedBox.classList.add('typing-cursor');
+    // 尝试提取已完整的 optimized 字段（流式 JSON 中可能尚未闭合）
+    const extracted = extractField(full, 'optimized');
+    optimizedBox.textContent = extracted || full;
+    // 自动滚到底
+    optimizedBox.scrollTop = optimizedBox.scrollHeight;
+  });
+  // 从未完成的 JSON 字符串里提取某字段值（容错）
+  function extractField(jsonStr, field) {
+    try {
+      const obj = JSON.parse(jsonStr);
+      return obj[field] || '';
+    } catch {
+      // 用正则兜底提取
+      const m = jsonStr.match(new RegExp(`"${field}"\\s*:\\s*"([\\s\\S]*?)(?:"|$)`));
+      return m ? m[1].replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\\/g, '\\') : '';
+    }
+  }
+
+  // ===== 示例提示词 =====
+  const EXAMPLES = [
+    '帮我写个朋友圈文案，关于周末爬山',
+    '做一个番茄钟的 Python 脚本',
+    '写一封委婉的请假邮件',
+    '解释一下什么是闭包',
+    '帮我规划 3 天东京行程',
+    '写一段短视频口播脚本，主题是极简生活',
+  ];
+  const exBox = document.getElementById('examples');
+  EXAMPLES.forEach(text => {
+    const chip = document.createElement('div');
+    chip.className = 'example-chip';
+    chip.textContent = text.length > 14 ? text.slice(0, 14) + '…' : text;
+    chip.title = text;
+    chip.addEventListener('click', () => {
+      document.getElementById('input').value = text;
+      document.getElementById('input').focus();
+      SFX.play('click');
+    });
+    exBox.appendChild(chip);
+  });
+
+  // ===== 历史记录 =====
+  async function loadHistoryUI() {
+    const list = await window.api.getHistory();
+    const box = document.getElementById('historyList');
+    const clearBtn = document.getElementById('clearHistBtn');
+    box.innerHTML = '';
+    if (!list || list.length === 0) {
+      box.innerHTML = '<div class="history-empty">暂无历史记录，优化一次试试吧~</div>';
+      clearBtn.style.display = 'none';
+      return;
+    }
+    clearBtn.style.display = 'inline-block';
+    const styleMap = { rigorous: '严谨', creative: '创意', concise: '简洁' };
+    list.slice(0, 10).forEach(h => {
+      const item = document.createElement('div');
+      item.className = 'history-item';
+      const time = new Date(h.createdAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+      item.innerHTML = `
+        <div class="h-raw">${escapeHtml(h.rawInput)}</div>
+        <div class="h-meta"><span class="style-tag">${styleMap[h.style] || h.style}</span><span>${time}</span></div>
+      `;
+      item.addEventListener('click', () => {
+        document.getElementById('input').value = h.rawInput;
+        document.getElementById('optimized').textContent = h.optimized;
+        lastOptimized = h.optimized;
+        lastRawInput = h.rawInput;
+        document.getElementById('result').classList.add('show');
+        // 同步风格按钮
+        document.querySelectorAll('.style-btn').forEach(b => {
+          b.classList.toggle('active', b.dataset.style === h.style);
+        });
+        currentStyle = h.style;
+        SFX.play('click');
+        document.getElementById('input').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+      box.appendChild(item);
+    });
+  }
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  }
+  loadHistoryUI();
+
+  document.getElementById('clearHistBtn').addEventListener('click', async () => {
+    if (!confirm('确定清空所有历史记录？')) return;
+    await window.api.clearHistory();
+    loadHistoryUI();
+    SFX.play('click');
+  });
+
+  // ===== 快捷键 =====
+  document.addEventListener('keydown', (e) => {
+    // Ctrl/Cmd + Enter 触发优化
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      document.getElementById('optimizeBtn').click();
+    }
+    // Esc 关闭面板
+    if (e.key === 'Escape') {
+      window.api.closePanel();
+    }
+  });
+
+  // 加载等级显示
+  async function refreshLevelTag() {
+    try {
+      const p = await window.api.getProfile();
+      document.getElementById('levelTag').textContent =
+        `Lv.${p.level} · ${p.exp % 50}/50`;
+    } catch {}
+  }
+  refreshLevelTag();
+
+  document.querySelectorAll('.style-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.style-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentStyle = btn.dataset.style;
+    });
+  });
+
+  document.getElementById('closeBtn').addEventListener('click', () => window.api.closePanel());
+
+  const settingsView = document.getElementById('settingsView');
+  const mainView = document.getElementById('mainView');
+  const wardrobeView = document.getElementById('wardrobeView');
+
+  function showView(view) {
+    mainView.style.display = (view === 'main') ? 'block' : 'none';
+    settingsView.classList.toggle('show', view === 'settings');
+    wardrobeView.classList.toggle('show', view === 'wardrobe');
+    // 视图切换动画
+    const target = view === 'main' ? mainView : (view === 'settings' ? settingsView : wardrobeView);
+    target.classList.remove('view-anim');
+    void target.offsetWidth;
+    target.classList.add('view-anim');
+  }
+
+  document.getElementById('settingsToggle').addEventListener('click', async () => {
+    const isOpen = settingsView.classList.contains('show');
+    if (isOpen) { showView('main'); return; }
+    const s = await window.api.getSettings();
+    document.getElementById('apiKey').value = s.apiKey || '';
+    document.getElementById('baseURL').value = s.baseURL || '';
+    document.getElementById('model').value = s.model || '';
+    document.getElementById('autoLaunch').checked = !!s.autoLaunch;
+    showView('settings');
+  });
+
+  // ===== 装扮中心 =====
+  let curProfile = { level: 1, skin: 'aurora', accessories: [] };
+
+  document.getElementById('wardrobeToggle').addEventListener('click', async () => {
+    const isOpen = wardrobeView.classList.contains('show');
+    if (isOpen) { showView('main'); return; }
+    await loadWardrobe();
+    showView('wardrobe');
+  });
+
+  async function loadWardrobe() {
+    curProfile = await window.api.getProfile();
+    // 风格高亮
+    document.querySelectorAll('.style-chip').forEach(chip => {
+      chip.classList.toggle('active', chip.dataset.style === (curProfile.style || 'tech'));
+    });
+    // 皮肤高亮
+    document.querySelectorAll('.skin-chip').forEach(chip => {
+      chip.classList.toggle('active', chip.dataset.skin === curProfile.skin);
+    });
+    // 装饰：锁定/佩戴状态
+    document.querySelectorAll('.acc-chip').forEach(chip => {
+      const needLv = parseInt(chip.dataset.lv, 10);
+      const locked = curProfile.level < needLv;
+      chip.classList.toggle('locked', locked);
+      chip.classList.toggle('worn', !locked && (curProfile.accessories || []).includes(chip.dataset.acc));
+    });
+  }
+
+  // 切换外观风格（科技/简笔画/粉笔）
+  document.querySelectorAll('.style-chip').forEach(chip => {
+    chip.addEventListener('click', async () => {
+      curProfile.style = chip.dataset.style;
+      document.querySelectorAll('.style-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      SFX.play('skin');
+      await window.api.saveAppearance({ skin: curProfile.skin, accessories: curProfile.accessories, style: curProfile.style });
+    });
+  });
+
+  // 切换皮肤
+  document.querySelectorAll('.skin-chip').forEach(chip => {
+    chip.addEventListener('click', async () => {
+      curProfile.skin = chip.dataset.skin;
+      document.querySelectorAll('.skin-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      SFX.play('skin');
+      await window.api.saveAppearance({ skin: curProfile.skin, accessories: curProfile.accessories, style: curProfile.style });
+    });
+  });
+
+  // 佩戴/卸下装饰
+  document.querySelectorAll('.acc-chip').forEach(chip => {
+    chip.addEventListener('click', async () => {
+      const needLv = parseInt(chip.dataset.lv, 10);
+      if (curProfile.level < needLv) {
+        SFX.play('error');
+        alert(`该装饰需要 Lv.${needLv} 解锁，继续加油优化提示词吧！`);
+        return;
+      }
+      const acc = chip.dataset.acc;
+      let list = curProfile.accessories || [];
+      if (list.includes(acc)) list = list.filter(a => a !== acc);
+      else list.push(acc);
+      curProfile.accessories = list;
+      chip.classList.toggle('worn');
+      SFX.play('wear');
+      await window.api.saveAppearance({ skin: curProfile.skin, accessories: list, style: curProfile.style });
+    });
+  });
+
+  // 装饰分类筛选
+  document.querySelectorAll('.acc-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.acc-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      const cat = tab.dataset.cat;
+      document.querySelectorAll('.acc-chip').forEach(chip => {
+        chip.classList.toggle('hidden', !(cat === 'all' || chip.dataset.cat === cat));
+      });
+    });
+  });
+
+  document.getElementById('saveBtn').addEventListener('click', async () => {
+    await window.api.saveSettings({
+      apiKey: document.getElementById('apiKey').value.trim(),
+      baseURL: document.getElementById('baseURL').value.trim(),
+      model: document.getElementById('model').value.trim(),
+      defaultStyle: currentStyle,
+      autoLaunch: document.getElementById('autoLaunch').checked,
+    });
+    showView('main');
+  });
+
+  const loading = document.getElementById('loading');
+  const result = document.getElementById('result');
+  const errorBox = document.getElementById('error');
+
+  document.getElementById('optimizeBtn').addEventListener('click', async () => {
+    const input = document.getElementById('input').value.trim();
+    if (!input) { alert('先告诉我你想说什么呀~'); return; }
+    lastRawInput = input;
+
+    // 进入流式状态：先清空结果区，显示 loading
+    loading.classList.add('show');
+    result.classList.remove('show');
+    errorBox.classList.remove('show');
+    optimizedBox.textContent = '';
+    optimizedBox.classList.add('typing-cursor');
+    isStreaming = false;
+
+    // 调用主进程：stream=true 流式输出
+    const res = await window.api.optimize({
+      rawInput: input,
+      style: currentStyle,
+      template: currentTemplate,
+      stream: true,
+    });
+
+    loading.classList.remove('show');
+    optimizedBox.classList.remove('typing-cursor');
+    isStreaming = false;
+
+    if (res.error) {
+      errorBox.textContent = '出错了：' + res.error;
+      errorBox.classList.add('show');
+      return;
+    }
+
+    lastOptimized = res.optimized;
+    document.getElementById('optimized').textContent = res.optimized;
+    const ul = document.getElementById('improvements');
+    ul.innerHTML = '';
+    (res.improvements || []).forEach(imp => {
+      const li = document.createElement('li');
+      li.textContent = imp;
+      ul.appendChild(li);
+    });
+    result.classList.add('show');
+
+    // 刷新等级（+经验）
+    refreshLevelTag();
+    if (res.profile && res.profile.leveledUp) {
+      const tag = document.getElementById('levelTag');
+      tag.style.animation = 'none';
+      tag.offsetHeight; // reflow
+      tag.style.boxShadow = '0 0 16px #ffd700';
+      setTimeout(() => tag.style.boxShadow = '', 2000);
+    }
+
+    // 刷新历史
+    loadHistoryUI();
+  });
+
+  // ===== 结果操作按钮 =====
+  document.getElementById('reOptimizeBtn').addEventListener('click', () => {
+    if (!lastRawInput) return;
+    document.getElementById('optimizeBtn').click();
+  });
+  document.getElementById('insertOriginalBtn').addEventListener('click', () => {
+    if (lastRawInput) document.getElementById('input').value = lastRawInput;
+    SFX.play('click');
+  });
+  document.getElementById('insertOptimizedBtn').addEventListener('click', () => {
+    if (lastOptimized) document.getElementById('input').value = lastOptimized;
+    SFX.play('click');
+  });
+
+  // ===== 对比视图 =====
+  document.getElementById('compareBtn').addEventListener('click', () => {
+    const cv = document.getElementById('compareView');
+    const isShow = cv.classList.toggle('show');
+    if (isShow) {
+      document.getElementById('compareOriginal').textContent = lastRawInput || '(空)';
+      document.getElementById('compareOptimized').textContent = lastOptimized || '(空)';
+    }
+    SFX.play('click');
+  });
+
+  document.getElementById('copyBtn').addEventListener('click', () => {
+    navigator.clipboard.writeText(lastOptimized);
+    SFX.play('click');
+    const btn = document.getElementById('copyBtn');
+    btn.textContent = '已复制!';
+    setTimeout(() => btn.textContent = '复制', 1500);
+  });
+</script>
+</body>
+</html>

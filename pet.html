@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8" />
+<script src="sfx.js"></script>
+<style>
+  /* ===== 皮肤主题：CSS 变量（默认极光蓝）===== */
+  :root {
+    --c1: #00d4ff;   /* 主色（描边/发光）*/
+    --c2: #0088ff;   /* 辅色 */
+    --eye: #00f0ff;  /* 眼睛 */
+    --head1: #2b3a67; --head2: #1a2342; --head3: #0f1530; /* 头部渐变 */
+  }
+  body[data-skin="flame"]  { --c1:#ff5e3a; --c2:#ff2d55; --eye:#ffd24d; --head1:#5a2326; --head2:#3a1418; --head3:#22090c; }
+  body[data-skin="purple"] { --c1:#a06bff; --c2:#6c2bff; --eye:#d8b4ff; --head1:#3a2b67; --head2:#241a42; --head3:#150f30; }
+  body[data-skin="green"]  { --c1:#2bffb4; --c2:#00cc88; --eye:#7dffcf; --head1:#1f5a47; --head2:#143a30; --head3:#09221a; }
+  body[data-skin="sakura"] { --c1:#ff8fc7; --c2:#ff5e9c; --eye:#ffd6ea; --head1:#67485a; --head2:#422a38; --head3:#301a26; }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+  html, body {
+    width: 100%; height: 100%;
+    background: transparent; overflow: hidden;
+    cursor: grab; font-family: "Microsoft YaHei", sans-serif;
+  }
+  body:active { cursor: grabbing; }
+
+  .pet-wrap {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: flex-end;
+    height: 100%; padding-bottom: 4px;
+  }
+
+  .level-badge {
+    margin-bottom: 4px; padding: 2px 10px;
+    background: linear-gradient(135deg, #ffd700, #ff9500);
+    color: #4a2800; font-size: 10px; font-weight: bold;
+    border-radius: 10px; box-shadow: 0 0 10px rgba(255,180,0,0.6);
+    white-space: nowrap; opacity: 0; transition: opacity 0.3s;
+  }
+  .level-badge.show { opacity: 1; }
+
+  .bubble {
+    margin-bottom: 6px; padding: 6px 12px; position: relative;
+    background: rgba(15,21,48,0.95); color: var(--c1);
+    font-size: 11px; border: 1px solid var(--c1);
+    border-radius: 12px; box-shadow: 0 0 14px var(--c1);
+    white-space: nowrap; max-width: 200px;
+    opacity: 0; transform: translateY(6px) scale(0.9);
+    transition: opacity .3s, transform .3s; pointer-events: none; z-index: 10;
+  }
+  .bubble.show { opacity: 1; transform: translateY(0) scale(1); }
+  .bubble::after {
+    content:''; position:absolute; bottom:-5px; left:50%;
+    transform:translateX(-50%) rotate(45deg);
+    width:8px; height:8px; background:rgba(15,21,48,0.95);
+    border-right:1px solid var(--c1); border-bottom:1px solid var(--c1);
+  }
+
+  /* ============ 机器人本体 ============ */
+  .robot {
+    position: relative; width: 160px; height: 200px;
+    animation: float 3s ease-in-out infinite;
+    transition: transform 0.2s;
+    filter: drop-shadow(0 0 14px var(--c1));
+  }
+  .robot:hover { transform: scale(1.04); }
+  .robot.thinking { animation: shake 0.4s ease-in-out infinite; }
+  .robot.happy { animation: jump 0.5s ease-in-out 3; }
+  .robot.sad { animation: droop 0.6s ease-in-out; filter: drop-shadow(0 0 10px rgba(255,80,100,0.6)); }
+  .robot.levelup { animation: levelSpin 1s ease-in-out; }
+  /* 躲藏时：缩小+半透明，像探头 */
+  .robot.hiding { animation: none; opacity: 0.85; }
+  .robot.sleeping .eye { transform: scaleY(0.1); }
+  /* 躲藏时露出的"小眼睛"提示标记，固定在窗口边缘，方便找到它 */
+  .peek-eyes {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%) scale(0);
+    display: flex; gap: 7px; z-index: 30;
+    transition: transform .3s ease;
+    pointer-events: none;
+  }
+  .peek-eyes .pe {
+    width: 11px; height: 11px; border-radius: 50%;
+    background: var(--eye); box-shadow: 0 0 8px var(--eye);
+    animation: peekBlink 3s ease-in-out infinite;
+  }
+  body[data-style="sketch"] .peek-eyes .pe,
+  body[data-style="chalk"]  .peek-eyes .pe { box-shadow: none; }
+  body[data-style="sketch"] .peek-eyes .pe { background: #2b2b2b; }
+  body[data-style="chalk"]  .peek-eyes .pe { background: #f4f4f0; }
+  /* 躲起来时才显示这对小眼睛 */
+  .pet-wrap.peeking .peek-eyes { transform: translate(-50%, -50%) scale(1); }
+  @keyframes peekBlink { 0%,90%,100%{transform:scaleY(1);} 94%{transform:scaleY(0.1);} }
+
+  .part { opacity: 0; transition: opacity 0.6s, transform 0.6s; }
+  .part.show { opacity: 1; }
+  .part.growing { animation: grow 0.8s cubic-bezier(.34,1.56,.64,1) forwards; }
+  /* 可佩戴装饰：默认不显示，加 .worn 才出现（且需 .show 解锁）*/
+  .acc { display: none; }
+  .acc.worn.show { display: block; opacity: 1; }
+
+  /* ---- 皇冠 Lv5 ---- */
+  .crown { position: absolute; top: -2px; left: 50%; transform: translateX(-50%);
+    font-size: 26px; z-index: 7; filter: drop-shadow(0 0 6px gold); }
+  /* ---- 光环 Lv4 ---- */
+  .halo { position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
+    width: 70px; height: 16px; border: 2px solid #ffe066; border-radius: 50%;
+    box-shadow: 0 0 12px #ffe066, inset 0 0 8px #ffe066; z-index: 2; }
+  /* ---- 天线 Lv1 ---- */
+  .antenna { position: absolute; top: 22px; left: 50%; transform: translateX(-50%);
+    width: 3px; height: 16px; background: linear-gradient(var(--c1), var(--head1)); z-index: 3; }
+  .antenna-ball { position: absolute; top: -6px; left: 50%; transform: translateX(-50%);
+    width: 9px; height: 9px; background: #ff4d6d; border-radius: 50%;
+    box-shadow: 0 0 12px #ff4d6d; animation: pulse 1.5s ease-in-out infinite; }
+
+  /* ---- 头 Lv1 ---- */
+  .head { position: absolute; top: 36px; left: 50%; transform: translateX(-50%);
+    width: 76px; height: 64px;
+    background: linear-gradient(160deg, var(--head1) 0%, var(--head2) 60%, var(--head3) 100%);
+    border-radius: 20px; border: 2px solid var(--c1);
+    box-shadow: inset 0 2px 10px rgba(255,255,255,0.08), 0 4px 18px var(--c2); z-index: 5; }
+  .visor { position: absolute; top: 13px; left: 50%; transform: translateX(-50%);
+    width: 58px; height: 28px;
+    background: radial-gradient(ellipse at center, #001428 0%, #000810 100%);
+    border-radius: 14px; border: 1.5px solid var(--c1); overflow: hidden; }
+  .eyes { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: 100%; height: 100%; transition: transform 0.12s ease-out; }
+  .eye { position: absolute; top: 8px; width: 13px; height: 13px;
+    background: var(--eye); border-radius: 50%; box-shadow: 0 0 12px var(--eye); }
+  .eye.left { left: 9px; } .eye.right { right: 9px; }
+  .eyes.blink .eye { transform: scaleY(0.1); }
+  .robot.thinking .eye { background: #ffd24d; box-shadow: 0 0 12px #ffd24d; }
+  .robot.happy .eye, .robot.levelup .eye { background: #4dff88; box-shadow: 0 0 12px #4dff88; border-radius: 50% 50% 0 0; height: 7px; top: 12px; }
+  .robot.sad .eye { background: #ff6b8a; box-shadow: 0 0 10px #ff6b8a; transform: scaleY(0.6); }
+  .scan { position: absolute; left: 0; width: 100%; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--c1), transparent);
+    opacity: 0.6; animation: scanMove 2.5s linear infinite; }
+
+  /* ---- 拟人化：嘴巴 + 腮红（在面罩下方）---- */
+  .mouth { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+    width: 16px; height: 7px; border: 2px solid var(--c1); border-top: none;
+    border-radius: 0 0 16px 16px; transition: all 0.3s; }
+  .robot.happy .mouth, .robot.levelup .mouth { width: 20px; height: 11px; border-color: #4dff88; }
+  .robot.thinking .mouth { width: 8px; height: 8px; border-radius: 50%; border-top: 2px solid #ffd24d; }
+  .robot.sad .mouth { border: 2px solid #ff6b8a; border-bottom: none; border-radius: 16px 16px 0 0; height: 6px; bottom: 6px; }
+  .cheek { position: absolute; bottom: 12px; width: 9px; height: 6px;
+    background: #ff7eb6; border-radius: 50%; opacity: 0.55; filter: blur(1px); }
+  .cheek.left { left: 14px; } .cheek.right { right: 14px; }
+
+  /* 耳侧 */
+  .side { position: absolute; top: 50px; width: 8px; height: 22px;
+    background: linear-gradient(var(--c1), var(--head2)); border-radius: 4px;
+    box-shadow: 0 0 8px var(--c1); z-index: 4; }
+  .side.left { left: 32px; } .side.right { right: 32px; }
+
+  /* ---- 躯干 Lv2 ---- */
+  .body { position: absolute; top: 96px; left: 50%; transform: translateX(-50%);
+    width: 64px; height: 62px; background: linear-gradient(160deg, var(--head1), var(--head2));
+    border-radius: 16px 16px 14px 14px; border: 2px solid var(--c1);
+    box-shadow: inset 0 2px 8px rgba(255,255,255,0.06), 0 4px 14px var(--c2); z-index: 4; }
+  .core { position: absolute; top: 18px; left: 50%; transform: translateX(-50%);
+    width: 22px; height: 22px; border-radius: 50%;
+    background: radial-gradient(circle, var(--eye) 0%, var(--c2) 60%, #003a66 100%);
+    box-shadow: 0 0 16px var(--c1); animation: coreGlow 1.8s ease-in-out infinite; }
+  .neck { position: absolute; top: 92px; left: 50%; transform: translateX(-50%);
+    width: 16px; height: 10px; background: var(--head2); border: 1px solid var(--c1); z-index: 3; }
+
+  /* ---- 手臂 Lv3 ---- */
+  .arm { position: absolute; top: 102px; width: 14px; height: 46px;
+    background: linear-gradient(var(--head1), var(--head2));
+    border: 1.5px solid var(--c1); border-radius: 8px; z-index: 3; }
+  .arm.left { left: 24px; transform-origin: top center; animation: armSwingL 3s ease-in-out infinite; }
+  .arm.right { right: 24px; transform-origin: top center; animation: armSwingR 3s ease-in-out infinite; }
+  .arm::after { content:''; position:absolute; bottom:-6px; left:50%; transform:translateX(-50%);
+    width:16px; height:16px; background: radial-gradient(circle, var(--c1), var(--head2));
+    border-radius:50%; box-shadow:0 0 8px var(--c1); }
+
+  /* ---- 肩甲 Lv4 ---- */
+  .shoulder { position: absolute; top: 96px; width: 26px; height: 18px;
+    background: linear-gradient(135deg, #ffe066, #ff9500); border-radius: 12px 12px 4px 4px;
+    z-index: 5; box-shadow: 0 0 10px rgba(255,180,0,0.6); }
+  .shoulder.left { left: 16px; } .shoulder.right { right: 16px; }
+
+  /* ---- 能量翅膀 Lv5 ---- */
+  .wing { position: absolute; top: 96px; width: 40px; height: 70px; z-index: 1; }
+  .wing.left { left: -18px; transform-origin: right center; animation: wingFlapL 2.5s ease-in-out infinite; }
+  .wing.right { right: -18px; transform-origin: left center; animation: wingFlapR 2.5s ease-in-out infinite; }
+  .wing-inner { width: 100%; height: 100%;
+    background: linear-gradient(135deg, var(--c1), rgba(120,80,255,0.3));
+    box-shadow: 0 0 18px var(--c1); }
+  .wing.left .wing-inner { clip-path: polygon(100% 0, 100% 100%, 0 60%, 30% 30%); }
+  .wing.right .wing-inner { clip-path: polygon(0 0, 0 100%, 100% 60%, 70% 30%); }
+
+  .base-glow { position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);
+    width: 80px; height: 14px;
+    background: radial-gradient(ellipse at center, var(--c1), transparent 70%);
+    opacity: 0.5; border-radius: 50%; animation: glowPulse 3s ease-in-out infinite; z-index: 0; }
+
+  /* ====== 可佩戴装饰（emoji 实现，轻量）======
+     头部约在 top:36px、宽76px。头顶类装饰需足够大(≈52px)并下移到扣在头上 */
+  .acc-hat    { position:absolute; top:-8px; left:50%; transform:translateX(-50%); font-size:54px; line-height:1; z-index:8; filter:drop-shadow(0 2px 3px rgba(0,0,0,.4)); }
+  .acc-scarf  { position:absolute; top:88px; left:50%; transform:translateX(-50%); font-size:30px; line-height:1; z-index:6; }
+  .acc-phones { position:absolute; top:34px; left:50%; transform:translateX(-50%); font-size:66px; line-height:1; z-index:6; opacity:.9; }
+  .acc-saber  { position:absolute; top:104px; right:2px; font-size:38px; line-height:1; z-index:6; transform:rotate(20deg); filter:drop-shadow(0 0 6px var(--c1)); }
+  .acc-bow    { position:absolute; top:6px; left:50%; transform:translateX(-50%); font-size:30px; line-height:1; z-index:8; }
+  .acc-cape   { position:absolute; top:92px; left:50%; transform:translateX(-50%); font-size:72px; line-height:1; z-index:0; opacity:.85; }
+  /* 新增装饰 */
+  .acc-glasses{ position:absolute; top:46px; left:50%; transform:translateX(-50%); font-size:40px; line-height:1; z-index:6; }
+  .acc-wizard { position:absolute; top:-16px; left:50%; transform:translateX(-50%); font-size:56px; line-height:1; z-index:8; filter:drop-shadow(0 2px 3px rgba(0,0,0,.4)); }
+  .acc-wand   { position:absolute; top:100px; right:0; font-size:34px; line-height:1; z-index:6; transform:rotate(-25deg); filter:drop-shadow(0 0 8px gold); }
+  .acc-guitar { position:absolute; top:106px; left:0; font-size:34px; line-height:1; z-index:6; transform:rotate(15deg); }
+  .acc-mask   { position:absolute; top:42px; left:50%; transform:translateX(-50%); font-size:44px; line-height:1; z-index:6; }
+  .acc-flower { position:absolute; top:30px; left:26px; font-size:24px; line-height:1; z-index:8; }
+  .acc-medal  { position:absolute; top:116px; left:50%; transform:translateX(-50%); font-size:28px; line-height:1; z-index:6; }
+  .acc-mount  { position:absolute; bottom:-4px; left:50%; transform:translateX(-50%); font-size:64px; line-height:1; z-index:0; }
+  .acc-pet    { position:absolute; bottom:24px; right:-12px; font-size:30px; line-height:1; z-index:6; animation:float 2.4s ease-in-out infinite; }
+
+  .particles { position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:20; }
+  .star { position: absolute; top:40%; left:50%; font-size:16px; opacity:0; }
+  .star.burst { animation: starBurst 1s ease-out forwards; }
+
+  /* ============================================================
+     ✏️ 风格 B：简笔画（线条风）—— 透明填充 / 细黑线 / 圆头 / 无发光
+     通过 body[data-style="sketch"] 覆盖，DOM 与逻辑完全不变
+     ============================================================ */
+  body[data-style="sketch"] {
+    --line: #2b2b2b;          /* 简笔画线条色：深灰黑 */
+  }
+  body[data-style="sketch"] .robot { filter: none; }
+  /* 统一：所有部件透明填充 + 细线 + 去发光 */
+  body[data-style="sketch"] .head,
+  body[data-style="sketch"] .body,
+  body[data-style="sketch"] .visor,
+  body[data-style="sketch"] .neck,
+  body[data-style="sketch"] .arm,
+  body[data-style="sketch"] .side,
+  body[data-style="sketch"] .shoulder,
+  body[data-style="sketch"] .core,
+  body[data-style="sketch"] .antenna-ball,
+  body[data-style="sketch"] .cheek {
+    background: transparent !important;
+    border-color: var(--line) !important;
+    box-shadow: none !important;
+  }
+  body[data-style="sketch"] .head { border-width: 2.5px; }
+  body[data-style="sketch"] .visor { border-width: 2px; background: transparent !important; }
+  body[data-style="sketch"] .body { border-width: 2.5px; }
+  body[data-style="sketch"] .arm { border-width: 2.5px; }
+  body[data-style="sketch"] .arm::after { background: transparent !important; border: 2.5px solid var(--line); box-shadow: none !important; }
+  body[data-style="sketch"] .neck { border-width: 2px; }
+  body[data-style="sketch"] .side { border: 2.5px solid var(--line); }
+  body[data-style="sketch"] .antenna { background: var(--line) !important; }
+  body[data-style="sketch"] .antenna-ball { border: 2px solid var(--line); animation: none; }
+  body[data-style="sketch"] .core { border: 2.5px solid var(--line); animation: none; }
+  body[data-style="sketch"] .scan { display: none; }     /* 去掉扫描线 */
+  body[data-style="sketch"] .base-glow { display: none; } /* 去掉地面光 */
+  /* 眼睛/嘴：实心黑点 + 黑线，像简笔画表情 */
+  body[data-style="sketch"] .eye { background: var(--line) !important; box-shadow: none !important; }
+  body[data-style="sketch"] .mouth { border-color: var(--line) !important; }
+  body[data-style="sketch"] .cheek { border: 1.5px solid #ff9bb3; background: transparent !important; opacity: .7; }
+  /* 肩甲 / 皇冠 / 翅膀：线框化 */
+  body[data-style="sketch"] .shoulder { border: 2.5px solid var(--line); }
+  body[data-style="sketch"] .halo { border-color: var(--line) !important; box-shadow: none !important; }
+  body[data-style="sketch"] .crown { filter: grayscale(1) contrast(0.3) brightness(0.4); }
+  body[data-style="sketch"] .wing-inner { background: transparent !important; border: 2.5px solid var(--line); box-shadow: none !important; }
+  body[data-style="sketch"] .wing.left .wing-inner,
+  body[data-style="sketch"] .wing.right .wing-inner { clip-path: none; border-radius: 0 60% 60% 60%; }
+  /* 手绘抖动：轻微不规则，更有铅笔味 */
+  body[data-style="sketch"] .head,
+  body[data-style="sketch"] .body { border-radius: 47% 53% 48% 52% / 52% 48% 53% 47%; }
+
+  /* ============================================================
+     🖍️ 风格 C：粉笔白线（深色板书风）—— 白色粗线 + 轻微发光
+     ============================================================ */
+  body[data-style="chalk"] {
+    --line: #f4f4f0;
+  }
+  body[data-style="chalk"] { background: transparent; }
+  body[data-style="chalk"] .robot { filter: drop-shadow(0 0 1px rgba(255,255,255,0.5)); }
+  body[data-style="chalk"] .head,
+  body[data-style="chalk"] .body,
+  body[data-style="chalk"] .visor,
+  body[data-style="chalk"] .neck,
+  body[data-style="chalk"] .arm,
+  body[data-style="chalk"] .side,
+  body[data-style="chalk"] .shoulder,
+  body[data-style="chalk"] .core,
+  body[data-style="chalk"] .antenna-ball,
+  body[data-style="chalk"] .cheek {
+    background: transparent !important;
+    border-color: var(--line) !important;
+    box-shadow: none !important;
+  }
+  body[data-style="chalk"] .head,
+  body[data-style="chalk"] .body,
+  body[data-style="chalk"] .arm,
+  body[data-style="chalk"] .side,
+  body[data-style="chalk"] .shoulder,
+  body[data-style="chalk"] .core { border-width: 2.5px; border-style: solid; }
+  body[data-style="chalk"] .arm::after { background: transparent !important; border: 2.5px solid var(--line); box-shadow: none !important; }
+  body[data-style="chalk"] .antenna { background: var(--line) !important; }
+  body[data-style="chalk"] .antenna-ball { border: 2px solid var(--line); animation: none; }
+  body[data-style="chalk"] .core { animation: none; }
+  body[data-style="chalk"] .scan { display: none; }
+  body[data-style="chalk"] .base-glow { display: none; }
+  body[data-style="chalk"] .eye { background: var(--line) !important; box-shadow: none !important; }
+  body[data-style="chalk"] .mouth { border-color: var(--line) !important; }
+  body[data-style="chalk"] .cheek { border: 1.5px dashed var(--line); background: transparent !important; opacity: .6; }
+  body[data-style="chalk"] .halo { border-color: var(--line) !important; box-shadow: none !important; }
+  body[data-style="chalk"] .crown { filter: grayscale(1) brightness(2.2); }
+  body[data-style="chalk"] .wing-inner { background: transparent !important; border: 2.5px solid var(--line); box-shadow: none !important; }
+  body[data-style="chalk"] .wing.left .wing-inner,
+  body[data-style="chalk"] .wing.right .wing-inner { clip-path: none; border-radius: 0 60% 60% 60%; }
+  body[data-style="chalk"] .head,
+  body[data-style="chalk"] .body { border-radius: 46% 54% 49% 51% / 53% 47% 54% 46%; }
+
+  /* ============================================================
+     🐱 风格 D：室友猫（Bongo Cat 简笔画风）
+     纯白填充 + 描边跟随皮肤色(--c1) + 几何符号表情 + 纯2D无光影
+     复用现有 DOM：head→猫脸  body→猫身  eye→圆点眼  mouth→ω嘴
+     arm→猫爪  cheek→粉腮；多余科技部件隐藏；用伪元素加耳朵+尾巴
+     ============================================================ */
+  body[data-style="cat"] .robot { filter: none; }
+  /* 隐藏科技专属部件（注意：.visor 不能整个 display:none，
+     因为 .eyes 是它的子元素，否则猫眼无法显示与跟随鼠标） */
+  body[data-style="cat"] .scan,
+  body[data-style="cat"] .side,
+  body[data-style="cat"] .neck,
+  body[data-style="cat"] .core,
+  body[data-style="cat"] .antenna,
+  body[data-style="cat"] .shoulder,
+  body[data-style="cat"] .halo,
+  body[data-style="cat"] .base-glow,
+  body[data-style="cat"] .wing { display: none !important; }
+  /* 猫形态下：让 visor 透明并铺满整个头，作为眼睛容器 */
+  body[data-style="cat"] .visor {
+    top: 0 !important; left: 0 !important;
+    transform: none !important;
+    width: 100% !important; height: 100% !important;
+    background: transparent !important;
+    border: none !important; box-shadow: none !important;
+    border-radius: 0 !important; overflow: visible !important;
+  }
+
+  /* 猫脸：白圆脸 + 黑(皮肤色)描边 */
+  body[data-style="cat"] .head {
+    top: 30px; width: 92px; height: 78px;
+    background: #fff !important;
+    border: 3px solid var(--c1) !important;
+    border-radius: 50% 50% 46% 46% !important;
+    box-shadow: none !important; overflow: visible;
+  }
+  /* 两只三角耳（伪元素）：白填充 + 皇冠色描边(用多向drop-shadow勾边) */
+  body[data-style="cat"] .head::before,
+  body[data-style="cat"] .head::after {
+    content: ''; position: absolute; top: -18px;
+    width: 0; height: 0;
+    border-left: 15px solid transparent;
+    border-right: 15px solid transparent;
+    border-bottom: 26px solid #fff;
+    filter: drop-shadow(1.5px 0 0 var(--c1)) drop-shadow(-1.5px 0 0 var(--c1))
+            drop-shadow(0 -1.5px 0 var(--c1)) drop-shadow(0 1.5px 0 var(--c1));
+    z-index: -1;
+  }
+  body[data-style="cat"] .head::before { left: 4px; transform: rotate(-16deg); }
+  body[data-style="cat"] .head::after  { right: 4px; transform: rotate(16deg); }
+
+  /* 眼睛：黑(皮肤色)实心圆点，复用眨眼/跟随
+     ⚠️ transform 不能加 !important，否则会覆盖 JS 的 inline style 鼠标跟随。
+     给 .eyes 一个明确高度，避免 height:auto 在 absolute 子元素下塌缩。 */
+  body[data-style="cat"] .eyes {
+    top: 38px !important; left: 0 !important;
+    width: 100% !important; height: 16px !important;
+    transform: none;
+    transition: transform 0.12s ease-out;
+  }
+  body[data-style="cat"] .eye {
+    width: 10px !important; height: 10px !important; top: 0 !important;
+    background: #2b2b2b !important;
+    box-shadow: none !important;
+    border-radius: 50% !important;
+  }
+  body[data-style="cat"] .eye.left { left: 24px !important; right: auto !important; }
+  body[data-style="cat"] .eye.right { right: 24px !important; left: auto !important; }
+
+  /* 嘴：ω 形（用两段下弧）—— 复用 .mouth 做中间，伪元素补两侧 */
+  body[data-style="cat"] .mouth {
+    bottom: 18px; width: 10px; height: 6px;
+    border: 2px solid var(--c1) !important; border-top: none !important;
+    border-radius: 0 0 10px 10px; background: transparent;
+  }
+  /* 粉色腮红点缀 */
+  body[data-style="cat"] .cheek {
+    bottom: 22px; width: 12px; height: 8px;
+    background: #ffb3c8 !important; border: none !important;
+    opacity: .85; filter: none;
+  }
+  body[data-style="cat"] .cheek.left { left: 12px; }
+  body[data-style="cat"] .cheek.right { right: 12px; }
+  /* 鼻子：小粉三角（借 visor 容器已隐藏，用 head 后伪元素不够，改加在 mouth 上方）*/
+  body[data-style="cat"] .eyes::after {
+    content: ''; position: absolute; top: 20px; left: 50%;
+    transform: translateX(-50%);
+    width: 0; height: 0; border-left: 4px solid transparent;
+    border-right: 4px solid transparent; border-top: 5px solid #ff8fb0;
+  }
+
+  /* 猫身：白色椭圆身体 */
+  body[data-style="cat"] .body {
+    top: 100px; width: 74px; height: 64px;
+    background: #fff !important;
+    border: 3px solid var(--c1) !important;
+    border-radius: 46% 46% 42% 42% !important;
+    box-shadow: none !important;
+  }
+  /* 猫爪（手臂）：短白爪 */
+  body[data-style="cat"] .arm {
+    top: 120px; width: 18px; height: 30px;
+    background: #fff !important;
+    border: 3px solid var(--c1) !important;
+    border-radius: 10px !important; box-shadow: none !important;
+  }
+  body[data-style="cat"] .arm.left { left: 26px; }
+  body[data-style="cat"] .arm.right { right: 26px; }
+  body[data-style="cat"] .arm::after { display: none !important; }
+
+  /* 尾巴：借 crown 部件容器不行（Lv5才出现），改用 body 的伪元素，始终在身体右侧 */
+  body[data-style="cat"] .body::after {
+    content: ''; position: absolute; right: -22px; bottom: 6px;
+    width: 30px; height: 14px;
+    border: 3px solid var(--c1); border-left: none; border-bottom: none;
+    border-radius: 0 60% 0 0;
+    background: transparent;
+    transform-origin: left center;
+    animation: catTail 2.6s ease-in-out infinite;
+  }
+  @keyframes catTail { 0%,100%{transform:rotate(-8deg);} 50%{transform:rotate(14deg);} }
+
+  /* 猫形态下：装饰重定位/缩放，匹配更大更圆的猫脸(top30宽92)与猫身 */
+  body[data-style="cat"] .acc-hat    { top:-22px; font-size:50px; }      /* 帽子扣头顶（耳朵之上）*/
+  body[data-style="cat"] .acc-wizard { top:-30px; font-size:52px; }
+  body[data-style="cat"] .acc-bow     { top:-6px; left:30%; font-size:26px; } /* 蝴蝶结偏到一只耳朵旁 */
+  body[data-style="cat"] .acc-flower  { top:-4px; left:24px; font-size:24px; }
+  body[data-style="cat"] .acc-glasses { top:40px; font-size:42px; }      /* 墨镜对齐圆点眼 */
+  body[data-style="cat"] .acc-mask    { top:38px; font-size:46px; }
+  body[data-style="cat"] .acc-phones  { top:28px; font-size:74px; }      /* 耳机套住整张猫脸 */
+  body[data-style="cat"] .acc-scarf   { top:96px; font-size:32px; }      /* 围巾在脖子处 */
+  body[data-style="cat"] .acc-medal   { top:120px; font-size:28px; }
+  body[data-style="cat"] .acc-saber   { top:116px; right:-2px; font-size:34px; }
+  body[data-style="cat"] .acc-wand    { top:112px; right:-4px; font-size:32px; }
+  body[data-style="cat"] .acc-guitar  { top:118px; left:-4px; font-size:32px; }
+  body[data-style="cat"] .acc-cape    { top:100px; font-size:74px; }
+  body[data-style="cat"] .acc-mount   { bottom:-6px; font-size:62px; }
+  body[data-style="cat"] .acc-pet     { bottom:30px; right:-14px; font-size:28px; }
+
+  @keyframes float { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-6px);} }
+  @keyframes shake { 0%,100%{transform:rotate(-2deg);} 50%{transform:rotate(2deg);} }
+  @keyframes jump { 0%,100%{transform:translateY(0) scale(1);} 50%{transform:translateY(-12px) scale(1.04);} }
+  @keyframes droop { 0%{transform:translateY(0);} 50%{transform:translateY(6px) scale(0.97);} 100%{transform:translateY(0);} }
+  @keyframes levelSpin { 0%{transform:scale(1);} 30%{transform:scale(1.12) rotate(-8deg);} 60%{transform:scale(1.12) rotate(8deg);} 100%{transform:scale(1) rotate(0);} }
+  @keyframes grow { 0%{opacity:0;transform:scale(0.2);} 60%{opacity:1;transform:scale(1.15);} 100%{opacity:1;transform:scale(1);} }
+  @keyframes scanMove { 0%{top:0;opacity:0;} 50%{opacity:0.7;} 100%{top:26px;opacity:0;} }
+  @keyframes pulse { 0%,100%{transform:translateX(-50%) scale(1);opacity:1;} 50%{transform:translateX(-50%) scale(1.4);opacity:0.6;} }
+  @keyframes coreGlow { 0%,100%{box-shadow:0 0 12px var(--c1);} 50%{box-shadow:0 0 22px var(--c1),0 0 30px var(--c2);} }
+  @keyframes glowPulse { 0%,100%{opacity:0.4;width:80px;} 50%{opacity:0.8;width:92px;} }
+  @keyframes armSwingL { 0%,100%{transform:rotate(4deg);} 50%{transform:rotate(-4deg);} }
+  @keyframes armSwingR { 0%,100%{transform:rotate(-4deg);} 50%{transform:rotate(4deg);} }
+  @keyframes wingFlapL { 0%,100%{transform:rotateY(0) rotate(-6deg);} 50%{transform:rotateY(40deg) rotate(-12deg);} }
+  @keyframes wingFlapR { 0%,100%{transform:rotateY(0) rotate(6deg);} 50%{transform:rotateY(-40deg) rotate(12deg);} }
+  @keyframes starBurst { 0%{opacity:1;transform:translate(-50%,-50%) scale(0.3);} 100%{opacity:0;transform:translate(calc(-50% + var(--tx)),calc(-50% + var(--ty))) scale(1.3);} }
+</style>
+</head>
+<body data-skin="aurora">
+  <div class="pet-wrap">
+    <div class="level-badge" id="levelBadge">Lv.1 小智</div>
+    <div class="bubble" id="bubble"></div>
+    <!-- 躲到边缘时露出的小眼睛，提示它藏在这 -->
+    <div class="peek-eyes"><div class="pe"></div><div class="pe"></div></div>
+    <div class="robot" id="robot">
+      <!-- 翅膀 Lv5 -->
+      <div class="part wing left" data-lv="5"><div class="wing-inner"></div></div>
+      <div class="part wing right" data-lv="5"><div class="wing-inner"></div></div>
+      <!-- 披风装饰（可佩戴, Lv4解锁）-->
+      <div class="part acc acc-cape" data-lv="4" data-acc="cape">🦸</div>
+      <!-- 坐骑（可佩戴, Lv5）-->
+      <div class="part acc acc-mount" data-lv="5" data-acc="mount">🛹</div>
+
+      <!-- 皇冠 Lv5 / 光环 Lv4 -->
+      <div class="part crown" data-lv="5">👑</div>
+      <div class="part halo" data-lv="4"></div>
+
+      <!-- 装饰：帽子类（可佩戴）-->
+      <div class="part acc acc-hat" data-lv="2" data-acc="hat">🎩</div>
+      <div class="part acc acc-wizard" data-lv="4" data-acc="wizard">🧙</div>
+      <div class="part acc acc-bow" data-lv="4" data-acc="bow">🎀</div>
+      <div class="part acc acc-flower" data-lv="2" data-acc="flower">🌸</div>
+
+      <!-- 天线 + 头 Lv1 -->
+      <div class="antenna"><div class="antenna-ball"></div></div>
+      <!-- 耳机装饰（可佩戴, Lv3）-->
+      <div class="part acc acc-phones" data-lv="3" data-acc="phones">🎧</div>
+      <div class="head">
+        <div class="visor">
+          <div class="eyes" id="eyes">
+            <div class="eye left"></div>
+            <div class="eye right"></div>
+          </div>
+          <div class="scan"></div>
+        </div>
+        <div class="cheek left"></div>
+        <div class="cheek right"></div>
+        <div class="mouth"></div>
+      </div>
+      <!-- 墨镜/面具（可佩戴）-->
+      <div class="part acc acc-glasses" data-lv="3" data-acc="glasses">🕶️</div>
+      <div class="part acc acc-mask" data-lv="5" data-acc="mask">🎭</div>
+      <div class="side left"></div>
+      <div class="side right"></div>
+
+      <!-- 颈 + 躯干 Lv2 -->
+      <div class="part neck" data-lv="2"></div>
+      <div class="part body" data-lv="2"><div class="core"></div></div>
+      <!-- 围巾装饰（可佩戴, Lv2）-->
+      <div class="part acc acc-scarf" data-lv="2" data-acc="scarf">🧣</div>
+      <!-- 勋章（可佩戴, Lv4）-->
+      <div class="part acc acc-medal" data-lv="4" data-acc="medal">🏅</div>
+
+      <!-- 手臂 Lv3 -->
+      <div class="part arm left" data-lv="3"></div>
+      <div class="part arm right" data-lv="3"></div>
+      <!-- 武器类装饰（可佩戴, Lv3）-->
+      <div class="part acc acc-saber" data-lv="3" data-acc="saber">🗡️</div>
+      <div class="part acc acc-wand" data-lv="5" data-acc="wand">🪄</div>
+      <div class="part acc acc-guitar" data-lv="4" data-acc="guitar">🎸</div>
+      <!-- 小宠物伙伴（可佩戴, Lv5）-->
+      <div class="part acc acc-pet" data-lv="5" data-acc="petbird">🐤</div>
+
+      <!-- 肩甲 Lv4 -->
+      <div class="part shoulder left" data-lv="4"></div>
+      <div class="part shoulder right" data-lv="4"></div>
+
+      <div class="base-glow"></div>
+      <div class="particles" id="particles"></div>
+    </div>
+  </div>
+
+<script>
+  const robot = document.getElementById('robot');
+  const eyes = document.getElementById('eyes');
+  const bubble = document.getElementById('bubble');
+  const levelBadge = document.getElementById('levelBadge');
+  const particles = document.getElementById('particles');
+
+  let currentLevel = 1;
+  let wornAccessories = [];
+
+  // ===== 进化：按等级显示部件（装饰类不自动显示，由佩戴控制）=====
+  function applyEvolution(level, animateNew = false) {
+    const prevLevel = currentLevel;
+    currentLevel = level;
+    document.querySelectorAll('.part').forEach(part => {
+      const need = parseInt(part.dataset.lv, 10);
+      const isAcc = part.classList.contains('acc');
+      if (level >= need) {
+        const wasHidden = !part.classList.contains('show');
+        part.classList.add('show');
+        if (animateNew && wasHidden && need > prevLevel && !isAcc) {
+          part.classList.add('growing');
+          setTimeout(() => part.classList.remove('growing'), 800);
+        }
+      } else {
+        part.classList.remove('show');
+      }
+    });
+  }
+
+  // ===== 应用装扮（皮肤 + 佩戴装饰 + 风格）=====
+  function applyAppearance({ skin, accessories, style }) {
+    if (skin) document.body.dataset.skin = skin;
+    if (style) document.body.dataset.style = style;
+    if (Array.isArray(accessories)) {
+      wornAccessories = accessories;
+      document.querySelectorAll('.acc').forEach(a => {
+        if (accessories.includes(a.dataset.acc)) a.classList.add('worn');
+        else a.classList.remove('worn');
+      });
+    }
+  }
+
+  // ===== 眼睛跟随鼠标 =====
+  window.api.onMouseMove(({ dx, dy }) => {
+    const isCat = document.body.dataset.style === 'cat';
+    const max = isCat ? 4 : 4;
+    const sens = isCat ? 20 : 25;
+    const dist = Math.hypot(dx, dy) || 1;
+    const mx = Math.max(-max, Math.min(max, (dx / dist) * Math.min(dist / sens, max)));
+    const my = Math.max(-max, Math.min(max, (dy / dist) * Math.min(dist / sens, max)));
+    if (isCat) {
+      eyes.style.transform = `translate(${mx}px, ${my}px)`;
+    } else {
+      eyes.style.transform = `translate(calc(-50% + ${mx}px), calc(-50% + ${my}px))`;
+    }
+    // 让"挡住眼睛"的装饰（墨镜/面具）也轻微跟随
+    const followAccs = document.querySelectorAll('.acc-glasses.worn.show, .acc-mask.worn.show');
+    const fmx = mx * 0.6, fmy = my * 0.6;
+    followAccs.forEach(el => {
+      el.style.transform = `translate(calc(-50% + ${fmx}px), ${fmy}px)`;
+    });
+  });
+
+  // ===== 眨眼 =====
+  setInterval(() => {
+    eyes.classList.add('blink');
+    setTimeout(() => eyes.classList.remove('blink'), 150);
+  }, 3500 + Math.random() * 2000);
+
+  // ===== 气泡 =====
+  let bubbleTimer = null;
+  function showBubble(text, duration = 3000) {
+    bubble.textContent = text; bubble.classList.add('show');
+    clearTimeout(bubbleTimer);
+    bubbleTimer = setTimeout(() => bubble.classList.remove('show'), duration);
+  }
+
+  // ===== 待机俏皮话 =====
+  const talksByLevel = {
+    low: ['点我帮你优化提示词~', '今天想问 AI 什么呢？', '我还是个小不点，多用用我就长大啦！', '在线等你来调教 🤖'],
+    mid: ['我已经长出身体啦！💪', '提示词写得好，AI 没烦恼！', '帮我换身装扮呗？😋', '继续用我，我还能进化哦~'],
+    high: ['我是完全体战甲机器人！⚡', '王者归来，提示词优化交给我！👑', '展翅高飞，效率拉满！', '我们是最强搭档 ✨'],
+  };
+  function getTalks() {
+    if (currentLevel >= 5) return talksByLevel.high;
+    if (currentLevel >= 3) return talksByLevel.mid;
+    return talksByLevel.low;
+  }
+  function idleTalk() {
+    if (!bubble.classList.contains('show')) {
+      const t = getTalks();
+      showBubble(t[Math.floor(Math.random() * t.length)], 3500);
+    }
+    setTimeout(idleTalk, 8000 + Math.random() * 7000);
+  }
+  setTimeout(idleTalk, 2500);
+
+  // ===== 状态机 =====
+  function setState(cls, removeAfter) {
+    robot.classList.remove('thinking', 'happy', 'sad', 'levelup');
+    if (cls) robot.classList.add(cls);
+    if (removeAfter) setTimeout(() => robot.classList.remove(cls), removeAfter);
+  }
+  window.api.onPetState(({ state, level }) => {
+    if (state === 'thinking') { setState('thinking'); showBubble('让我想想… 🤔', 30000); }
+    else if (state === 'happy') { setState('happy', 1600); showBubble('搞定！效果不错吧~ 😎', 3000); SFX.play('success'); }
+    else if (state === 'sad') { setState('sad', 1500); showBubble('呜… 出错了，检查下设置？', 4000); SFX.play('error'); }
+    else if (state === 'hiding') {
+      robot.classList.add('hiding', 'sleeping');
+      document.querySelector('.pet-wrap').classList.add('peeking');
+      SFX.play('hide');
+      showBubble('我先躲一会儿~ 💤', 1500);
+    }
+    else if (state === 'showing') {
+      robot.classList.remove('hiding', 'sleeping');
+      document.querySelector('.pet-wrap').classList.remove('peeking');
+      SFX.play('show');
+      showBubble('我回来啦！😀', 1800);
+    }
+    else if (state === 'levelup') {
+      setState('levelup', 1100); burstStars(); applyEvolution(level, true);
+      SFX.play('levelup');
+      const evoMsg = { 2:'🎉 进化！我长出身体啦！', 3:'🎉 进化！我有手臂咯！', 4:'🎉 进化！获得黄金装甲！', 5:'🎉 完全体！翅膀+皇冠到手！👑' }[level] || `🎉 升级啦！Lv.${level}！`;
+      showBubble(evoMsg + ' 快去装扮我~', 4500);
+      refreshLevel();
+    }
+  });
+
+  // ===== 星星爆发 =====
+  function burstStars() {
+    const emojis = ['⭐','✨','🌟','💫','🎉'];
+    for (let i = 0; i < 14; i++) {
+      const s = document.createElement('div');
+      s.className = 'star'; s.textContent = emojis[i % emojis.length];
+      const angle = (i / 14) * Math.PI * 2, r = 60 + Math.random() * 30;
+      s.style.setProperty('--tx', Math.cos(angle) * r + 'px');
+      s.style.setProperty('--ty', Math.sin(angle) * r + 'px');
+      particles.appendChild(s);
+      requestAnimationFrame(() => s.classList.add('burst'));
+      setTimeout(() => s.remove(), 1100);
+    }
+  }
+
+  // ===== 等级 + 装扮初始化 =====
+  async function refreshLevel() {
+    try {
+      const p = await window.api.getProfile();
+      const titles = { 1:'雏形', 2:'成型', 3:'进化', 4:'强化', 5:'完全体' };
+      levelBadge.textContent = `Lv.${p.level} ${titles[Math.min(p.level,5)] || ''}`;
+      levelBadge.classList.add('show');
+      applyEvolution(p.level, false);
+      applyAppearance({ skin: p.skin, accessories: p.accessories, style: p.style });
+      setTimeout(() => levelBadge.classList.remove('show'), 4000);
+    } catch {}
+  }
+  refreshLevel();
+
+  // 监听面板发来的装扮变更，实时生效
+  window.api.onAppearanceChange((data) => applyAppearance(data));
+  // ===== 拖拽 / 点击 / 逗它 =====
+  let dragging = false, moved = false, lastX = 0, lastY = 0;
+  document.body.addEventListener('mousedown', (e) => { dragging = true; moved = false; lastX = e.screenX; lastY = e.screenY; });
+  document.body.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    const dx = e.screenX - lastX, dy = e.screenY - lastY;
+    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) moved = true;
+    if (moved) { window.api.movePet(dx, dy); lastX = e.screenX; lastY = e.screenY; }
+  });
+  document.body.addEventListener('mouseup', () => { if (dragging && !moved) { SFX.play('click'); window.api.togglePanel(); } dragging = false; });
+  robot.addEventListener('dblclick', () => {
+    robot.classList.add('happy');
+    setTimeout(() => robot.classList.remove('happy'), 1600);
+    SFX.play('boop');
+    const tease = ['哈哈痒痒~', '嘿嘿你好呀！', '别戳啦 😆', '喜欢我的新造型吗？'];
+    showBubble(tease[Math.floor(Math.random() * tease.length)], 2500);
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#00d4ff"/>
+      <stop offset="100%" stop-color="#0066ff"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="#0f1530"/>
+  <!-- 天线 -->
+  <line x1="256" y1="80" x2="256" y2="140" stroke="#00d4ff" stroke-width="6"/>
+  <circle cx="256" cy="76" r="14" fill="#ff4d6d"/>
+  <!-- 头 -->
+  <rect x="176" y="140" width="160" height="120" rx="36" fill="url(#g)" stroke="#00d4ff" stroke-width="4"/>
+  <rect x="200" y="168" width="112" height="56" rx="28" fill="#001428"/>
+  <!-- 眼睛 -->
+  <circle cx="232" cy="196" r="12" fill="#00f0ff"/>
+  <circle cx="280" cy="196" r="12" fill="#00f0ff"/>
+  <!-- 身体 -->
+  <rect x="196" y="276" width="120" height="120" rx="28" fill="url(#g)" stroke="#00d4ff" stroke-width="4"/>
+  <circle cx="256" cy="336" r="22" fill="#00f0ff" opacity="0.9"/>
+  <!-- 嘴 -->
+  <path d="M236 248 Q256 262 276 248" stroke="#00d4ff" stroke-width="4" fill="none"/>
+</svg>
